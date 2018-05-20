@@ -1,0 +1,48 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "vmssName": {
+            "value": "gskvmss"
+        },
+        "vmSku": {
+            "value": "Standard_A1_v2"
+        },
+        "adminUsername": {
+            "value": "miwestaw"
+        },
+        "instanceCount": {
+            "value": "2"
+        },
+        "singlePlacementGroup": {
+            "value": "true"
+        },
+        "priority": {
+            "value": "Regular"
+        },
+        "skuType": {
+            "value": "Standard"
+        },
+        "image": {
+            "value": {
+                "sku": "7.2",
+                "publisher": "OpenLogic",
+                "version": "latest",
+                "offer": "CentOS"
+            }
+        },
+        "adminPassword": {
+            "value": null
+        },
+        "existingVirtualNetworkName": {
+            "value": "myvnet"
+          },
+          "existingSubnetName": {
+            "value": "default"
+          },
+          "loadBalancerPrivateIpAddress": {
+            "value": "10.0.0.8"
+          }      
+
+    }
+}

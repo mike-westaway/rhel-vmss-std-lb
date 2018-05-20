@@ -2,9 +2,6 @@
     "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
-        "location": {
-            "type": "string"
-        },
         "vmssName": {
             "type": "string"
         },
@@ -23,16 +20,7 @@
         "singlePlacementGroup": {
             "type": "string"
         },
-        "pipName": {
-            "type": "string"
-        },
-        "pipLabel": {
-            "type": "string"
-        },
         "skuType": {
-            "type": "string"
-        },
-        "ipAllocationMethod": {
             "type": "string"
         },
         "priority": {
@@ -40,42 +28,52 @@
         },
         "adminPassword": {
             "type": "securestring"
-        }
+        },
+        "existingVirtualNetworkResourceGroupName": {
+            "type": "string",
+            "metadata": {
+              "description": "Name of the Resource Group containing the existing VNET"
+            }
+          },
+          "existingVirtualNetworkName": {
+            "type": "string",
+            "metadata": {
+              "description": "Name of the existing VNET"
+            }
+          },
+          "existingSubnetName": {
+            "type": "string",
+            "metadata": {
+              "description": "Name of the existing Subnet"
+            }
+          },
+          "loadBalancerPrivateIpAddress": {
+            "type": "string",
+            "metadata": {
+              "description": "IP address for the load balancer within the subnet"
+            }
+          }      
     },
     "variables": {
-        "vnetName": "[concat(parameters('vmssName'), 'Vnet')]",
+        "virtualNetworkName": "[parameters('existingVirtualNetworkName')]",
+        "subnetName": "[parameters('existingSubnetName')]",
+        "subnetRef": "[resourceId(subscription().subscriptionId, parameters('existingVirtualNetworkResourceGroupName'), 'Microsoft.Network/virtualNetworks/subnets', variables('virtualNetworkName'), variables('subnetName'))]",
+        "privateIpAddress":  "[parameters('loadBalancerPrivateIpAddress')]",
         "namingInfix": "[toLower(substring(concat(parameters('vmssName'), uniqueString(resourceGroup().id)), 0, 9))]",
         "networkApiVersion": "2018-01-01",
         "storageApiVersion": "2018-02-01",
         "computeApiVersion": "2017-12-01",
         "autoscaleApiVersion": "2015-04-01",
         "loadBalancerName": "[concat(parameters('vmssName'), 'lb')]",
-        "loadBalancerId": "[resourceId('Microsoft.Network/loadBalancers', variables('loadBalancerName'))]",
-        "networkSecurityGroupName": "[concat(parameters('vmssName'), 'nsg')]"
+        "loadBalancerId": "[resourceId('Microsoft.Network/loadBalancers', variables('loadBalancerName'))]"
     },
     "resources": [
         {
-            "type": "Microsoft.Network/publicIPAddresses",
-            "name": "[parameters('pipName')]",
-            "location": "[parameters('location')]",
-            "apiVersion": "[variables('networkApiVersion')]",
-            "sku": {
-                "name": "[parameters('skuType')]"
-            },
-            "properties": {
-                "publicIPAllocationMethod": "[parameters('ipAllocationMethod')]",
-                "dnsSettings": {
-                    "domainNameLabel": "[parameters('pipLabel')]"
-                }
-            }
-        },
-        {
             "type": "Microsoft.Network/loadBalancers",
             "name": "[variables('loadBalancerName')]",
-            "location": "[parameters('location')]",
+            "location": "[resourceGroup().location]",
             "apiVersion": "[variables('networkApiVersion')]",
             "dependsOn": [
-                "[concat('Microsoft.Network/publicIPAddresses/', parameters('pipName'))]"
             ],
             "sku": {
                 "name": "[parameters('skuType')]"
@@ -85,8 +83,11 @@
                     {
                         "name": "LoadBalancerFrontEnd",
                         "properties": {
-                            "publicIPAddress": {
-                                "id": "[resourceId('Microsoft.Network/publicIpAddresses', parameters('pipName'))]"
+                            "provisioningState": "Succeeded",
+                            "privateIPAddress": "[variables('privateIpAddress')]",
+                            "privateIPAllocationMethod": "Static",
+                            "subnet": {
+                              "id": "[variables('subnetRef')]"
                             }
                         }
                     }
@@ -145,75 +146,10 @@
             }
         },
         {
-            "type": "Microsoft.Network/networkSecurityGroups",
-            "apiVersion": "[variables('networkApiVersion')]",
-            "name": "[variables('networkSecurityGroupName')]",
-            "location": "[parameters('location')]",
-            "properties": {
-                "securityRules": [
-                    {
-                        "name": "allowSSH",
-                        "properties": {
-                            "description": "Allow SSH traffic",
-                            "protocol": "Tcp",
-                            "sourcePortRange": "*",
-                            "destinationPortRange": "22",
-                            "sourceAddressPrefix": "*",
-                            "destinationAddressPrefix": "*",
-                            "access": "Allow",
-                            "priority": 1000,
-                            "direction": "Inbound"
-                        }
-                    },
-                    {
-                        "name": "allowHTTP",
-                        "properties": {
-                            "description": "Allow web traffic",
-                            "protocol": "Tcp",
-                            "sourcePortRange": "*",
-                            "destinationPortRange": "80",
-                            "sourceAddressPrefix": "*",
-                            "destinationAddressPrefix": "*",
-                            "access": "Allow",
-                            "priority": 1001,
-                            "direction": "Inbound"
-                        }
-                    }
-                ]
-            }
-        },
-        {
-            "type": "Microsoft.Network/virtualNetworks",
-            "name": "[variables('vnetName')]",
-            "location": "[parameters('location')]",
-            "apiVersion": "[variables('networkApiVersion')]",
-            "properties": {
-                "addressSpace": {
-                    "addressPrefixes": [
-                        "10.0.0.0/16"
-                    ]
-                },
-                "subnets": [
-                    {
-                        "name": "default",
-                        "properties": {
-                            "addressPrefix": "10.0.0.0/21",
-                            "networkSecurityGroup": {
-                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
-                            }
-                        }
-                    }
-                ]
-            },
-            "dependsOn": [
-                "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
-            ]
-        },
-        {
             "name": "[parameters('vmssName')]",
             "type": "Microsoft.Compute/virtualMachineScaleSets",
             "apiVersion": "[variables('computeApiVersion')]",
-            "location": "[parameters('location')]",
+            "location": "[resourceGroup().location]",
             "dependsOn": [
                 "[concat('Microsoft.Network/loadBalancers/', variables('loadBalancerName'))]"
             ],
@@ -253,7 +189,7 @@
                                             "name": "[concat(parameters('vmssName'), 'IpConfig')]",
                                             "properties": {
                                                 "subnet": {
-                                                    "id": "[reference(variables('vnetName'), variables('networkApiVersion')).subnets[0].id]"
+                                                    "id": "[variables('subnetRef')]"
                                                 },
                                                 "loadBalancerBackendAddressPools": [
                                                     {
