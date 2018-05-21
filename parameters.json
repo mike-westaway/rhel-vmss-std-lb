@@ -26,9 +26,9 @@
         "image": {
             "value": {
                 "sku": "7.2",
-                "publisher": "OpenLogic",
+                "publisher": "RedHat",
                 "version": "latest",
-                "offer": "CentOS"
+                "offer": "RHEL"
             }
         },
         "adminPassword": {
